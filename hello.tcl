@@ -6,6 +6,8 @@ set_global_assignment -name DEVICE 10CL006YE144C8G
 set_global_assignment -name TOP_LEVEL_ENTITY hello
 
 set_global_assignment -name VERILOG_FILE hello.v
+set_global_assignment -name VERILOG_FILE uart.v
+set_global_assignment -name VERILOG_FILE math.v
 
 ## led 101 is over nceo
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
@@ -19,6 +21,8 @@ set_location_assignment PIN_98 -to leds[3]
 set_location_assignment PIN_91 -to clk 
 
 set_location_assignment PIN_88 -to reset
+
+set_location_assignment PIN_11 -to tx
 
 # set_location_assignment PIN_43 -to pll1_p
 # set_location_assignment PIN_44 -to pll1_n

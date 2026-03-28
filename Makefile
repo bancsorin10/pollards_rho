@@ -9,16 +9,16 @@ workdir=simulation_wd
 all: build program
 
 build:
-	$(quartus_path)/quartus_sh --flow compile hello
+	quartus_sh --flow compile hello
 
 program:
-	$(quartus_path)/quartus_pgm -c USB-Blaster -m JTAG -o "p;hello.sof"
+	quartus_pgm -c USB-Blaster -m JTAG -o "p;hello.sof"
 
 configure:
-	$(quartus_path)/quartus_sh -t hello.tcl
+	quartus_sh -t hello.tcl
 
 
 simulation: build
 	rm -rf $(workdir)
-	$(questa_path)/vlog -work $(workdir) hello.v
-	$(questa_path)/vsim -c $(workdir).hello_tb -do "run -all"
+	vlog -work $(workdir) hello.v
+	vsim -c $(workdir).hello_tb -do "run -all"
