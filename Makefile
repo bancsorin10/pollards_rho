@@ -20,5 +20,5 @@ configure:
 
 simulation: build
 	rm -rf $(workdir)
-	vlog -work $(workdir) hello.v
-	vsim -c $(workdir).hello_tb -do "run -all"
+	vlog -work $(workdir) hello.v math.v uart.v
+	vsim -c $(workdir).test_pollard -do "run -all"

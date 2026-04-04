@@ -1,44 +1,10 @@
 
-
-module gcd(
-    input clk,
-    input gcd_start,
-    input [127:0] x,
-    output reg gcd_stop,
-    output reg [127:0] res
-);
-
-    parameter [127:0] n;
-
-    reg [1:0] state;
-    reg [127:0] xx;
-
-    always @(posedge clk) begin
-        if (gcd_start == 0) begin
-            gcd_stop <= 0;
-            res <= n;
-            xx <= x;
-        end
-        else if (gcd_stop == 0) begin
-            if (res > xx) begin
-                res <= res - xx;
-            end
-            else if (xx > res) begin
-                xx <= xx - res;
-            end
-            else begin
-                gcd_stop <= 1;
-            end
-        end
-    end
-endmodule
-
 // everything should be going in the montgomery domain
 module pollard(
     input clk,
     input reset,
     output reg finish,
-    output [127:0] d
+    output [63:0] d
 );
 
     // default starting values for the pollard rho
@@ -46,14 +12,14 @@ module pollard(
     parameter b  = 7;
 
     // precomputed defaults for r, r', n, n'
-    parameter [127:0] n;
-    parameter [127:0] np;
-    parameter [127:0] r;
-    parameter [127:0] rp;
-    parameter [127:0] rm1;
+    parameter [63:0] n;
+    parameter [63:0] np;
+    parameter [63:0] r;
+    parameter [63:0] rp;
+    parameter [63:0] rm1;
     parameter [7:0] rs;
 
-    reg [3:0] state;
+    reg [4:0] state = 0;
     // 1. compute mx = x*x my = y*y
     // 2. compute tx = mx & rm1 * np
     //    same with ty = my & rm1 * np
@@ -92,28 +58,76 @@ module pollard(
     // the small number of dsp blocks on some boards and the need to pipeline/
     // parallelize this by a lot
 
-    reg [255:0] x;
-    reg [255:0] y;
+    reg [127:0] x = xs;
+    reg [127:0] y = xs;
 
-    reg [255:0] mx;
-    reg [255:0] my;
-    reg [255:0] tx;
-    reg [255:0] ty;
-    reg [127:0] diff;
+    reg [127:0] mx;
+    reg [127:0] my;
+    reg [127:0] tx;
+    reg [127:0] ty;
+    reg [63:0] diff;
 
     reg gcd_start = 0;
     wire gcd_stop;
+
+
+    // going with the small registers first to test things out, they should be
+    // increased according to the data
+    reg [63:0] mul0_x;
+    reg [63:0] mul0_y;
+    wire [127:0] mul0_res;
+    reg mul0_start;
+    wire mul0_stop;
+
+    reg [63:0] mul1_x;
+    reg [63:0] mul1_y;
+    wire [127:0] mul1_res;
+    reg mul1_start;
+    wire mul1_stop;
 
     gcd# (
         .n(n)
     ) gcd0 (
         .clk(clk),
+        .reset(reset),
         .x(diff),
-        .gcd_start(gcd_start),
-        .gcd_stop(gcd_stop),
+        .start(gcd_start),
+        .stop(gcd_stop),
         .res(d)
     );
 
+
+    // unsure how / if frequency will be affected by having only
+    // 2 multiplliers, might need to do one for each operation?
+    multiply mul0(
+        .clk(clk),
+        .reset(reset),
+        .x(mul0_x),
+        .y(mul0_y),
+        .start(mul0_start),
+        .stop(mul0_stop),
+        .res(mul0_res)
+    );
+
+    multiply mul1(
+        .clk(clk),
+        .reset(reset),
+        .x(mul1_x),
+        .y(mul1_y),
+        .start(mul1_start),
+        .stop(mul1_stop),
+        .res(mul1_res)
+    );
+
+    // NOTE: multiplication is done in a kind of synchronized manner, meaning
+    // I will wait for multiplications to finish before moving on, this is an
+    // early stage, there probably are some optimizations where you could just
+    // start the multiplications and do other stuff before it finishes
+
+    initial begin
+        x <= xs;
+        y <= xs;
+    end
 
     always @(posedge clk) begin
         if (reset) begin
@@ -121,98 +135,223 @@ module pollard(
             // reseting the finish button makes the logic not usable or not
             // synthesizable
             finish <= 0;
-            d <= 1;
+            // d <= 1;
             x <= xs;
             y <= xs;
         end
         else begin
             case (state)
-                4'b0000: begin
-                    mx <= x*x;
-                    my <= y*y;
-                    state <= 4'b0001;
+                5'b00000: begin
+                    // mx <= x*x;
+                    // my <= y*y;
+                    mul0_x <= x;
+                    mul0_y <= x;
+                    mul1_x <= y;
+                    mul1_y <= y;
+                    mul0_start <= 1;
+                    mul1_start <= 1;
+                    state <= 5'b00001;
+                    // state <= state + 1;
                 end
-                4'b0001: begin
-                    tx <= (mx & rm1) * np;
-                    ty <= (my & rm1) * np;
-                    state <= 4'b0010;
+                5'b00001: begin
+                    // skip a clock cycle for when the multiplication is
+                    // started previous stop values are still in place from
+                    // the previous one
+                    mul0_start <= 0;
+                    mul1_start <= 0;
+                    state <= 5'b00010;
                 end
-                4'b0010: begin
-                    tx <= (tx & rm1) * n;
-                    ty <= (ty & rm1) * n;
-                    state <= 4'b0011;
+                5'b00010: begin
+                    // wait out for the multiplication to end
+                    if (mul0_stop && mul1_stop) begin
+                        mx <= mul0_res;
+                        my <= mul1_res;
+                        state <= 5'b00011;
+                    end
                 end
-                4'b0011: begin
+                5'b00011: begin
+                    // tx <= (mx & rm1) * np;
+                    // ty <= (my & rm1) * np;
+                    mul0_x <= (mx & rm1);
+                    mul0_y <= np;
+                    mul1_x <= (my & rm1);
+                    mul1_y <= np;
+                    mul0_start <= 1;
+                    mul1_start <= 1;
+
+                    state <= 5'b00100;
+                end
+                5'b00100: begin
+                    // skip a clock cycle for when the multiplication is
+                    // started previous stop values are still in place from
+                    // the previous one
+                    mul0_start <= 0; // one  cycle should be enough
+                    mul1_start <= 0; // one  cycle should be enough
+                    state <= 5'b00101;
+                end
+                5'b00101: begin
+                    // wait for the multiplication
+                    if(mul0_stop && mul1_stop) begin
+                        tx <= mul0_res;
+                        ty <= mul1_res;
+                        state <= 5'b00110;
+                    end
+                end
+                5'b00110: begin
+                    // tx <= (tx & rm1) * n;
+                    // ty <= (ty & rm1) * n;
+                    mul0_x <= (tx & rm1);
+                    mul0_y <= n;
+                    mul1_x <= (ty & rm1);
+                    mul1_y <= n;
+                    mul0_start <= 1;
+                    mul1_start <= 1;
+                    state <= 5'b00111;
+                end
+                5'b00111: begin
+                    // skip a clock cycle for when the multiplication is
+                    // started previous stop values are still in place from
+                    // the previous one
+                    mul0_start <= 0; // one  cycle should be enough
+                    mul1_start <= 0; // one  cycle should be enough
+                    state <= 5'b01000;
+                end
+                5'b01000: begin
+                    // wait for the multiplication
+                    if (mul0_stop && mul1_stop) begin
+                        tx <= mul0_res;
+                        ty <= mul1_res;
+                        state <= 5'b01001;
+                    end
+                end
+                5'b01001: begin
                     x <= mx + tx;
                     y <= my + ty;
-                    state <= 4'b0100;
+                    state <= 5'b01010;
                 end
-                4'b0100: begin
+                5'b01010: begin
                     x <= x >> rs;
                     y <= y >> rs;
-                    state <= 4'b0101;
+                    state <= 5'b01011;
                 end
-                4'b0101: begin
+                5'b01011: begin
                     x <= (x + b) & rm1;
                     y <= (y + b) & rm1;
-                    state <= 4'b0110;
+                    state <= 5'b01100;
                 end
-                4'b0110: begin
-                    my <= y*y;
-                    state <= 4'b0111;
+                5'b01100: begin
+                    // my <= y*y;
+                    mul0_x <= y;
+                    mul0_y <= y;
+                    mul0_start <= 1;
+                    state <= 5'b01101;
                 end
-                4'b0111: begin
-                    ty <= (my & rm1) * np;
-                    state <= 4'b1000;
+                5'b01101: begin
+                    // skip a clock cycle for when the multiplication is
+                    // started previous stop values are still in place from
+                    // the previous one
+                    mul0_start <= 0; // one  cycle should be enough
+                    mul1_start <= 0; // one  cycle should be enough
+                    state <= 5'b01110;
                 end
-                4'b1000: begin
-                    ty <= (ty & rm1) * n;
-                    state <= 4'b1001;
+                5'b01110: begin
+                    // wait for the multiplication
+                    if (mul0_stop) begin
+                        my <= mul0_res;
+                        state <= 5'b01111;
+                    end
                 end
-                4'b1001: begin
+                5'b01111: begin
+                    // ty <= (my & rm1) * np;
+                    mul0_x <= (my & rm1);
+                    mul0_y <= np;
+                    mul0_start <= 1;
+                    state <= 5'b10000;
+                end
+                5'b10000: begin
+                    // skip a clock cycle for when the multiplication is
+                    // started previous stop values are still in place from
+                    // the previous one
+                    mul0_start <= 0; // one  cycle should be enough
+                    state <= 5'b10001;
+                end
+                5'b10001: begin
+                    // wait for the multiplication
+                    if (mul0_stop) begin
+                        ty <= mul0_res;
+                        state <= 5'b10010;
+                    end
+                end
+                5'b10010: begin
+                    // ty <= (ty & rm1) * n;
+                    mul0_x <= (ty & rm1);
+                    mul0_y <= n;
+                    mul0_start <= 1;
+                    state <= 5'b10011;
+                end
+                5'b10011: begin
+                    // skip a clock cycle for when the multiplication is
+                    // started previous stop values are still in place from
+                    // the previous one
+                    mul0_start <= 0; // one  cycle should be enough
+                    state <= 5'b10100;
+                end
+                5'b10100: begin
+                    // wait for the multiplication
+                    if (mul0_stop) begin
+                        ty <= mul0_res;
+                        state <= 5'b10101;
+                    end
+                end
+                5'b10101: begin
                     y <= my + ty;
-                    state <= 4'b1010;
+                    state <= 5'b10110;
                 end
-                4'b1010: begin
+                5'b10110: begin
                     y <= y >> rs;
-                    state <= 4'b1011;
+                    state <= 5'b10111;
                 end
-                4'b1011: begin
+                5'b10111: begin
                     y <= (y + b) & rm1;
-                    state <= 4'b1100;
+                    state <= 5'b11000;
                 end
-                4'b1100: begin
+                5'b11000: begin
                     if (x > n) begin
                         x <= x - n;
                     end
                     if (y > n) begin
                         y <= y - n;
                     end
-                    state <= 4'b1101;
+                    state <= 5'b11001;
                 end
-                4'b1101: begin
+                5'b11001: begin
                     if (x > y) begin
                         diff <= x - y;
                     end
                     else begin
                         diff <= y - x;
                     end
-                    gcd_start <= 1'b1;
-                    state <= 4'b1110;
+                    gcd_start <= 1;
+                    state <= 5'b11010;
                 end
-                4'b1110: begin
+                5'b11010: begin
+                    // wait loop for the gcd_stop to go back to 0 from
+                    // a previous run
+                    gcd_start <= 0;
+                    state <= 5'b11011;
+                end
+                5'b11011: begin
                     if (gcd_stop == 1'b1) begin
-                        gcd_start <= 1'b0;
-                        state <= 4'b1111;
+                        state <= 5'b11110;
                     end
                 end
-                4'b1111: begin
-                    if (d == 1'b1) begin
-                        state <= 4'b0000;
+                5'b11110: begin
+                    if (d == 64'b1) begin
+                        state <= 5'b00000;
                     end
                     else begin
                         // loop either crashed or found a factor
-                        finish <= 1'b1;
+                        finish <= 1;
                     end
                 end
                 default: begin
@@ -240,19 +379,23 @@ module hello(
     wire [1:0] clk_out;
 
     wire p0_end;
-    wire [127:0] p0_res;
+    wire [63:0] p0_res;
 
     wire busy_tx;
     reg start_uart;
     integer s = 0;
     reg [7:0] data_tx;
 
-    localparam [127:0] n = 323;
-    localparam [127:0] np = 149;
-    localparam [127:0] r = 512;
-    localparam [127:0] rp = 94;
-    localparam [127:0] rm1 = 511;
+    localparam [63:0] n = 323;
+    localparam [63:0] np = 149;
+    localparam [63:0] r = 512;
+    localparam [63:0] rp = 94;
+    localparam [63:0] rm1 = 511;
     localparam [7:0] rs = 9;
+
+    initial begin
+        leds = 4'b1111;
+    end
 
     altpll# (
         // .operation_mode("NO_COMPENSATION"),
@@ -260,7 +403,7 @@ module hello(
         .inclk0_input_frequency(20000),
         .clk0_multiply_by(1),
         .clk0_divide_by(2),
-        .clk1_multiply_by(8),
+        .clk1_multiply_by(2),
         .clk1_divide_by(1)
     )PLL(
         .inclk(clk),
@@ -269,13 +412,12 @@ module hello(
         .areset(reset)
     );
 
-    uart_transmit uart0(
+    send_number senn(
         .clk(clk_out[0]),
-        .reset(reset),
-        .data(data_tx),
+        .reset(reste),
+        .x(p0_res),
         .start(start_uart),
-        .tx(tx),
-        .busy(busy_tx)
+        .tx(tx)
     );
 
     pollard# (
@@ -289,6 +431,7 @@ module hello(
         .rs(rs)
     ) pollard0(
         .clk(clk_out[1]),
+        // .clk(clk),
         .reset(reset),
         .finish(p0_end),
         .d(p0_res)
@@ -299,28 +442,58 @@ module hello(
             // leds <= data_tx;
             start_uart <= 0;
         end
-        else if (busy_tx) begin
-            start_uart <= 0;
-        end
-        else if (s < 50_000_000) begin
-            s <= s + 1;
-        end
-        else begin
-            s <= 0;
-            // leds <= leds -1;
-            data_tx <= p0_res;
-            start_uart <= 1;
+        if (p0_end) begin
+            // leds <= 4'b0000;
+            if (p0_res == n) begin
+                // loop crashed
+                leds <= 4'b0110;
+            end
+            else begin
+                start_uart <= 1;
+                leds <= 4'b0000;
+            end
         end
     end
 
     always @* begin
-        if (p0_end == 1) begin
-            leds = 4'b0000;
-        end
-        else begin
-            leds = 4'b1111;
-        end
         // leds = ~leds_rev;
+    end
+endmodule
+
+module test_pollard;
+
+    reg clk = 0;
+    wire p0_end;
+    wire [63:0] p0_res;
+    reg reset;
+
+    always #1 clk = ~clk;
+
+    pollard# (
+        .xs(2),
+        .b(7),
+        .n(323),
+        .np(149),
+        .r(512),
+        .rp(94),
+        .rm1(511),
+        .rs(9)
+    ) poll(
+        .clk(clk),
+        .reset(reset),
+        .finish(p0_end),
+        .d(p0_res)
+    );
+
+
+    initial begin
+        $dumpfile("dump.vcd");
+        $dumpvars(0, clk, p0_end, poll.mx, poll.mul1.state, poll.mul1_x, poll.mul1_y, poll.my, poll.mul0.state, poll.state, p0_res, poll.mul0_x, poll.mul0_y, poll.gcd0.res, poll.diff, poll.x, poll.y, poll.mul0_res, poll.mul1_res);
+        #1 reset = 1;
+        #3 reset = 0;
+
+        #500
+        $finish(500);
     end
 
 endmodule

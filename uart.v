@@ -1,5 +1,6 @@
 // we'll do one stop bit, single bit per character, 8 characters
 // setting uart by stty -F /dev/ttyS0 115200 -parenb -cstopb cs8
+// better stty -F /dev/ttyUSB0 115200 raw -echo -ixon -ixoff -crtscts
 module uart_transmit(
     input clk,
     input reset,

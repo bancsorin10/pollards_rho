@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 24.1std.0 Build 1077 03/04/2025 SC Lite Edition
-# Date created = 23:39:45  March 15, 2026
+# Date created = 13:35:55  March 29, 2026
 #
 # -------------------------------------------------------------------------- #
 #
@@ -40,11 +40,12 @@
 set_global_assignment -name FAMILY "Cyclone 10 LP"
 set_global_assignment -name DEVICE 10CL006YE144C8G
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 24.1STD.0
-set_global_assignment -name PROJECT_CREATION_TIME_DATE "23:39:45  MARCH 15, 2026"
+set_global_assignment -name PROJECT_CREATION_TIME_DATE "13:35:55  MARCH 29, 2026"
 set_global_assignment -name LAST_QUARTUS_VERSION "24.1std.0 Lite Edition"
 set_global_assignment -name TOP_LEVEL_ENTITY hello
 set_global_assignment -name VERILOG_FILE hello.v
 set_global_assignment -name VERILOG_FILE uart.v
+set_global_assignment -name VERILOG_FILE math.v
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 set_location_assignment PIN_101 -to leds[0]
 set_location_assignment PIN_100 -to leds[1]

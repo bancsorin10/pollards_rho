@@ -1,1 +1,8 @@
-db
+*
+*/
+
+!hello.v
+!math.v
+!Makefile
+!hello.tcl
+!uart.v
