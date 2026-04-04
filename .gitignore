@@ -6,3 +6,4 @@
 !Makefile
 !hello.tcl
 !uart.v
+!.gitignore
