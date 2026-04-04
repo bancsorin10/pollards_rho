@@ -403,7 +403,7 @@ module hello(
         .inclk0_input_frequency(20000),
         .clk0_multiply_by(1),
         .clk0_divide_by(2),
-        .clk1_multiply_by(2),
+        .clk1_multiply_by(8),
         .clk1_divide_by(1)
     )PLL(
         .inclk(clk),

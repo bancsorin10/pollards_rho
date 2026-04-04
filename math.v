@@ -78,27 +78,26 @@ module gcd(
     end
 endmodule
 
-
 module multiply(
     input clk,
     input reset,
-    input [63:0] x,
-    input [63:0] y,
+    input [1023:0] x,
+    input [1023:0] y,
     input start,
     output reg stop,
-    output reg [127:0] res
+    output reg [3:0] leds,
+    output reg [2047:0] res
 );
 
     reg [3:0] state;
     reg [17:0] xx;
     reg [17:0] yy;
-    reg [63:0] xxx;
-    reg [63:0] yyy;
+    reg [35:0] temp;
     reg [7:0] size;
-    reg [83:0] sizer;
-    reg [3:0] ops;
-    reg [3:0] i;
-    reg [3:0] j;
+    reg [1024:0] sizer;
+    reg [7:0] ops;
+    reg [7:0] i;
+    reg [7:0] j;
     reg [7:0] ii;
     reg [7:0] jj;
     reg [3:0] k;
@@ -107,9 +106,11 @@ module multiply(
     localparam [17:0] word_mask = 18'h3ffff;
     // reg [word_size - 1:0] carry;
 
-    reg [37:0] inter;
-    reg [23:0] carry;
+    reg [2047:0] inter;
+    // reg [23:0] carry;
     reg [15:0] shifter;
+
+    reg shit = 0;
 
     reg [2:0] ls; // loop step
 
@@ -120,13 +121,13 @@ module multiply(
             size <= 0;
             sizer <= 1;
             stop <= 0;
-            carry <= 0;
             i <= 0;
             inter <= 0;
             shifter <= 0;
             ls <= 0;
         end
         else begin
+            // leds <= ops;
             case (state)
                 4'b0000: begin
                     if (start == 1) begin
@@ -134,10 +135,8 @@ module multiply(
                         // yy <= y;
                         res <= 0;
                         state <= 4'b0001;
-                        stop <= 0;
                         sizer <= 1;
                         size <= 0;
-                        carry <= 0;
                         shifter <= 0;
                         inter <= 0;
                         i <= 0;
@@ -156,16 +155,13 @@ module multiply(
                 end
                 4'b0010: begin
                     if (i == ops) begin
-                        inter <= 0;
-                        // state <= 4'b0100; // get out of the for loop
-                        // i <= 0;
-                        state <= 4'b0000;
-                        stop <= 1;
-                        res <= res + (inter << ops);
+                        state <= 4'b0100;
+                        inter <= inter << shifter;
+                        // res <= res + (inter << ops);
+                        // leds <= i;
                     end
                     else begin
                         if ((i + 1) > size) begin
-                        // if ((i + 1) > ops) begin
                             j <= i + 1 - size;
                         end
                         else begin
@@ -175,12 +171,13 @@ module multiply(
                     end
                 end
                 4'b0011: begin
-                    if (((i < size) && (j == i + 1)) || ((i >= size) && (j == size))) begin
+                    if (((i < size) && (j > i)) || ((i >= size) && (j == size))) begin
                         i <= i + 1;
                         shifter <= shifter + word_size;
                         inter <= inter >> word_size;
                         res <= res + ((inter&word_mask) << shifter);
                         state <= 4'b0010;
+                        shit = ~shit;
                     end
                     else begin
                         // should somehow achive inter += x[j] * y[i-j]
@@ -201,12 +198,22 @@ module multiply(
                             yy <= y >> jj;
                             ls <= 3;
                         end
+                        else if (ls == 3) begin
+                            temp <= xx * yy;
+                            ls <= 4;
+                        end
                         else begin
-                            inter <= inter + xx * yy;
+                            inter <= inter + temp;
                             j <= j + 1;
                             ls <= 0;
                         end
                     end
+                end
+                4'b0100: begin
+                    stop <= 1;
+                    state <= 4'b0000;
+                    inter <= 0;
+                    res <= res + inter;
                 end
                 default: begin
                     xx <= 0;
@@ -215,7 +222,6 @@ module multiply(
                     state <= 4'b0000;
                     size <= 1;
                     stop <= 0;
-                    // carry <= 0;
                 end
             endcase
         end
