@@ -66,7 +66,7 @@ endmodule
 module send_number(
     input clk,
     input reset,
-    input [63:0] x,
+    input [1023:0] x,
     input start,
     output tx
 );
@@ -74,7 +74,7 @@ module send_number(
     reg [7:0] data;
     reg start_tx;
     reg [1:0] state;
-    reg [63:0] xx;
+    reg [1023:0] xx;
 
     wire busy;
 

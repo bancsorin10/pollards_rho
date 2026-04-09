@@ -12,6 +12,8 @@ set_global_assignment -name VERILOG_FILE math.v
 ## led 101 is over nceo
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
 
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 12
+
 
 set_location_assignment PIN_101 -to leds[0]
 set_location_assignment PIN_100 -to leds[1]

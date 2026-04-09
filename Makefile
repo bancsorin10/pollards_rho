@@ -18,7 +18,7 @@ configure:
 	quartus_sh -t hello.tcl
 
 
-simulation: build
+simulation:
 	rm -rf $(workdir)
 	vlog -work $(workdir) hello.v math.v uart.v
 	vsim -c $(workdir).test_pollard -do "run -all"
