@@ -69,7 +69,7 @@ module gcd(
                     end
                     else if (xs < ys) begin
                         state <= 2'b01;
-yy <= yy - xx;
+                        yy <= yy - xx;
                         // TODO: this should be a variable type of shift
                         // starter, if 00 reduce the shift where you reset
                         // might not be as simple as that tho, as there could
@@ -121,8 +121,13 @@ module add(
 
     reg [3:0] state = 0;
 
-    reg [1:0] c = 0;
-    reg [513:0] temp = 0;
+    reg c = 0;
+    reg [256:0] temp = 0;
+
+    reg [2043:0] xx;
+    reg [2043:0] yy;
+
+    reg [15:0] shifter = 0;
 
 
     // just do 4 additions temp = x+y; hardcode [511:0], [1023:512] ...
@@ -132,56 +137,54 @@ module add(
             res <= 0;
             state <= 4'b0000;
             temp <= 0;
+            xx <= 0;
+            yy <= 0;
             c <= 0;
         end
         else begin
         case (state)
             4'b0000: begin
                 if (start) begin
-                    temp <= x[511:0] + y[511:0];
+                    // temp <= x[255:0] + y[255:0];
                     stop <= 0;
+                    res <= 0;
                     state <= 4'b0001;
+                    xx <= x;
+                    yy <= y;
+                    c <= 0;
+                    shifter <= 0;
                 end
             end
             4'b0001: begin
-                c <= temp[513:512];
-                res[511:0] <= temp[511:0];
-                temp <= x[1023:512] + y[1023:512];
-                state <= 4'b0010;
+                if ((xx > 0) || (yy > 0)) begin
+                    temp <= xx[255:0] + yy[255:0];
+                    state <= 4'b0010;
+                end
+                else begin
+                    stop <= 1;
+                    state <= 4'b0000;
+                end
             end
             4'b0010: begin
                 temp <= temp + c;
                 state <= 4'b0011;
+                c <= temp[256];
             end
             4'b0011: begin
-                res[1023:512] <= temp[511:0];
-                c <= temp[513:512];
-                temp <= x[1535:1024] + y[1535:1024];
-                state <= 4'b0100;
-            end
-            4'b0100: begin
-                temp <= temp + c;
-                state <= 4'b0101;
-            end
-            4'b0101: begin
-                res[1535:1024] <= temp[511:0];
-                c <= temp[513:512];
-                temp <= x[2043:1536] + y[2043:1536];
-                state <= 4'b0110;
-            end
-            4'b0110: begin
-                temp <= temp + c;
-                state <= 4'b0111;
-            end
-            4'b0111: begin
-                res[2043:1536] <= temp[511:0];
-                stop <= 1;
-                state <= 4'b0000;
+                res <= res | (temp[255:0] << shifter);
+                shifter <= shifter + 256;
+                xx <= xx >> 256;
+                yy <= yy >> 256;
+                state <= 4'b0001;
             end
             default: begin
                 state <= 4'b0000;
                 stop <= 0;
                 res <= 0;
+                shifter <= 0;
+                c <= 0;
+                xx <= 0;
+                yy <= 0;
                 temp <= 0;
             end
         endcase
