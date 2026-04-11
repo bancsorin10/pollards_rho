@@ -4,6 +4,7 @@
 
 This is a verilog implementation of the pollard's rho. This uses comba
 multiplication and try factor the RSA 896 (google the rsa factoring challenge).
+Multiplications are done in the montgomery domain as to avoid doing divisions.
 
 Some additions are being restructured to go over multiple cycles as to try and
 reduce the area.
