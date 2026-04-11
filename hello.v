@@ -287,103 +287,134 @@ module pollard(
                     state <= 6'b001101;
                 end
                 6'b001101: begin
-                    x <= (x[1023:0] + b) & rm1;
-                    y <= (y[1023:0] + b) & rm1;
+                    // x <= (x[1023:0] + b) & rm1;
+                    // y <= (y[1023:0] + b) & rm1;
+                    add0_x <= x[1023:0];
+                    add0_y <= b;
+                    add1_x <= y[1023:0];
+                    add1_y <= b;
+                    add0_start <= 1;
+                    add1_start <= 1;
                     state <= 6'b001110;
                 end
                 6'b001110: begin
+                    // waiting cycle
+                    add0_start <= 0;
+                    add1_start <= 0;
+                    state <= 6'b001111;
+                end
+                6'b001111: begin
+                    x <= add0_res & rm1;
+                    y <= add1_res & rm1;
+                    state <= 6'b010000;
+                end
+                6'b010000: begin
                     if (x > n) begin
                         x <= x[1023:0] - n;
                     end
                     if (y > n) begin
                         y <= y[1023:0] - n;
                     end
-                    state <= 6'b001111;
+                    state <= 6'b010001;
 
                 end
-                6'b001111: begin
+                6'b010001: begin
                     // my <= y*y;
                     mul0_x <= y;
                     mul0_y <= y;
                     mul0_start <= 1;
-                    state <= 6'b010000;
+                    state <= 6'b010010;
                 end
-                6'b010000: begin
+                6'b010010: begin
                     // skip a clock cycle for when the multiplication is
                     // started previous stop values are still in place from
                     // the previous one
                     mul0_start <= 0; // one  cycle should be enough
                     mul1_start <= 0; // one  cycle should be enough
-                    state <= 6'b010001;
+                    state <= 6'b010011;
                 end
-                6'b010001: begin
+                6'b010011: begin
                     // wait for the multiplication
                     if (mul0_stop) begin
                         my <= mul0_res;
-                        state <= 6'b010010;
+                        state <= 6'b010100;
                     end
                 end
-                6'b010010: begin
+                6'b010100: begin
                     // ty <= (my & rm1) * np;
                     mul0_x <= (my & rm1);
                     mul0_y <= np;
                     mul0_start <= 1;
-                    state <= 6'b010011;
+                    state <= 6'b010101;
                 end
-                6'b010011: begin
+                6'b010101: begin
                     // skip a clock cycle for when the multiplication is
                     // started previous stop values are still in place from
                     // the previous one
                     mul0_start <= 0; // one  cycle should be enough
-                    state <= 6'b010100;
+                    state <= 6'b010110;
                 end
-                6'b010100: begin
+                6'b010110: begin
                     // wait for the multiplication
                     if (mul0_stop) begin
                         ty <= mul0_res;
-                        state <= 6'b010101;
+                        state <= 6'b010111;
                     end
                 end
-                6'b010101: begin
+                6'b010111: begin
                     // ty <= (ty & rm1) * n;
                     mul0_x <= (ty & rm1);
                     mul0_y <= n;
                     mul0_start <= 1;
-                    state <= 6'b010110;
+                    state <= 6'b011000;
                 end
-                6'b010110: begin
+                6'b011000: begin
                     // skip a clock cycle for when the multiplication is
                     // started previous stop values are still in place from
                     // the previous one
                     mul0_start <= 0; // one  cycle should be enough
-                    state <= 6'b010111;
-                end
-                6'b010111: begin
-                    // wait for the multiplication
-                    if (mul0_stop) begin
-                        ty <= mul0_res;
-                        state <= 6'b011000;
-                    end
-                end
-                6'b011000: begin
-                    y <= my + ty;
                     state <= 6'b011001;
                 end
                 6'b011001: begin
-                    y <= y >> rs;
-                    state <= 6'b011010;
+                    // wait for the multiplication
+                    if (mul0_stop) begin
+                        ty <= mul0_res;
+                        state <= 6'b011010;
+                    end
                 end
                 6'b011010: begin
-                    y <= (y + b) & rm1;
+                    // y <= my + ty;
+                    add0_x <= my;
+                    add0_y <= ty;
+                    add0_start <= 1;
                     state <= 6'b011011;
                 end
                 6'b011011: begin
-                    if (y > n) begin
-                        y <= y[1023:0] - n;
-                    end
+                    // waiting cycle
+                    add0_start <= 0;
                     state <= 6'b011100;
                 end
                 6'b011100: begin
+                    if (add0_stop) begin
+                        y <= add0_res;
+                        state <= 6'b011101;
+                    end
+                end
+                6'b011101: begin
+                    y <= y >> rs;
+                    state <= 6'b011110;
+                end
+                6'b011110: begin
+                    y <= (y + b) & rm1;
+                    state <= 6'b011111;
+                end
+                6'b011111: begin
+                    if (y > n) begin
+                        y <= y[1023:0] - n;
+                    end
+                    state <= 6'b100000;
+                end
+                6'b100000: begin
                     if (x > y) begin
                         diff <= x[1023:0] - y[1023:0];
                     end
@@ -391,20 +422,20 @@ module pollard(
                         diff <= y[1023:0] - x[1023:0];
                     end
                     gcd_start <= 1;
-                    state <= 6'b011101;
+                    state <= 6'b100001;
                 end
-                6'b011101: begin
+                6'b100001: begin
                     // wait loop for the gcd_stop to go back to 0 from
                     // a previous run
                     gcd_start <= 0;
-                    state <= 6'b011110;
+                    state <= 6'b100010;
                 end
-                6'b011110: begin
+                6'b100010: begin
                     if (gcd_stop == 1'b1) begin
-                        state <= 6'b011111;
+                        state <= 6'b100011;
                     end
                 end
-                6'b011111: begin
+                6'b100011: begin
                     if (d == 64'b1) begin
                         state <= 6'b000000;
                     end
