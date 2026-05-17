@@ -8,3 +8,5 @@
 !uart.v
 !.gitignore
 !readme.md
+!*.txt
+!*.v

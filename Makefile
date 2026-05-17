@@ -18,7 +18,21 @@ configure:
 	quartus_sh -t hello.tcl
 
 
-simulation: build
+config: configure
+
+simulation:
 	rm -rf $(workdir)
-	vlog -work $(workdir) hello.v math.v uart.v
-	vsim -c $(workdir).test_pollard -do "run -all"
+	vlog -work $(workdir) math.v ram.v test_bench.v gcd_rewrite.v uart.v
+	vsim -c $(workdir).test_gcd_rew -do "run -all"
+	vsim -c -voptargs="+acc=rn" $(workdir).test_pollard -do "run -all"
+	vsim -c $(workdir).test_mul -do "run -all"
+	vsim -c $(workdir).test_clear -do "run -all"
+	vsim -c $(workdir).test_copy -do "run -all"
+	vsim -c $(workdir).test_shift -do "run -all"
+	vsim -c $(workdir).test_full_add -do "run -all"
+	vsim -c $(workdir).test_constant_add -do "run -all"
+	vsim -c $(workdir).test_compare -do "run -all"
+	vsim -c $(workdir).test_full_sub -do "run -all"
+	vsim -c -voptargs="+acc=rn" $(workdir).test_gcd -do "run -all"
+
+sim: simulation

@@ -3,11 +3,13 @@ project_new hello -overwrite
 
 set_global_assignment -name FAMILY "Cyclone 10 LP"
 set_global_assignment -name DEVICE 10CL006YE144C8G
-set_global_assignment -name TOP_LEVEL_ENTITY hello
+set_global_assignment -name TOP_LEVEL_ENTITY pollard
 
 set_global_assignment -name VERILOG_FILE hello.v
-set_global_assignment -name VERILOG_FILE uart.v
+set_global_assignment -name VERILOG_FILE ram.v
 set_global_assignment -name VERILOG_FILE math.v
+set_global_assignment -name VERILOG_FILE uart.v
+# set_global_assignment -name SYSTEMVERILOG_FILE hello.sv
 
 ## led 101 is over nceo
 set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
@@ -22,8 +24,6 @@ set_location_assignment PIN_91 -to clk
 
 set_location_assignment PIN_88 -to reset
 
-set_location_assignment PIN_11 -to tx
-
 # set_location_assignment PIN_43 -to pll1_p
 # set_location_assignment PIN_44 -to pll1_n
 # set_location_assignment PIN_113 -to pll2_n
@@ -31,6 +31,8 @@ set_location_assignment PIN_11 -to tx
 
 # defining pll s through sdc did not work
 set_global_assignment -name SDC_FILE hello.sdc
+
+set_location_assignment PIN_11 -to uart_tx
 
 ## create pll ip
 # ip-make-project -name test_pll -path ./test_pll

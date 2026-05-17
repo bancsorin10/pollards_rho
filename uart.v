@@ -1,6 +1,5 @@
 // we'll do one stop bit, single bit per character, 8 characters
 // setting uart by stty -F /dev/ttyS0 115200 -parenb -cstopb cs8
-// better stty -F /dev/ttyUSB0 115200 raw -echo -ixon -ixoff -crtscts
 module uart_transmit(
     input clk,
     input reset,
@@ -60,83 +59,52 @@ module uart_transmit(
     end
 endmodule
 
-// send number over UART every 2 seconds, expected clk 25MHz
-// this is expected to be used after a really long computation to constantly
-// output the result
-module send_number(
+module uart_receive(
     input clk,
     input reset,
-    input [63:0] x,
-    input start,
-    output tx
+    input rx,
+    output reg [7:0] data,
+    output reg ready
 );
+    parameter FREQ = 25_000_000;
+    parameter BAUD = 115_200;
+    localparam PERIOD = FREQ / BAUD;
 
-    reg [7:0] data;
-    reg start_tx;
-    reg [1:0] state;
-    reg [63:0] xx;
-
-    wire busy;
-
-    integer s;
-
-
-    uart_transmit send0(
-        .clk(clk),
-        .reset(reset),
-        .start(start_tx),
-        .data(data),
-        .tx(tx),
-        .busy(busy)
-    );
+    reg [3:0] bit;
+    reg [7:0] counter;
+    reg [7:0] buffer;
 
     always @(posedge clk) begin
         if (reset) begin
-            state <= 2'b00;
-            xx <= x;
-            start_tx <= 0;
-            s <= 0;
+            bit     <= 0;
+            ready   <= 0;
+            counter <= 0;
         end
-        else if (start) begin
-            case (state)
-                2'b00: begin
-                    if (start) begin
-                        xx <= x;
-                        state <= state + 1;
-                        start_tx <= 0;
-                    end
+        else if (rx == 0 && bit == 0) begin
+            bit     <= 1;
+            // counter <= -PERIOD/2;
+            counter <= 0;
+            ready   <= 0;
+        end
+        else if (bit > 0) begin
+            if (counter < PERIOD - 1) begin
+                counter <= counter + 1;
+            end
+            else begin
+                counter <= 0;
+                if (bit < 9) begin
+                    buffer[bit - 1] <= rx;
+                    bit <= bit + 1;
                 end
-                2'b01: begin
-                    if ((start_tx) && (!busy)) begin
-                        // account for the 1 cycle latency between starting
-                        // and being busy
-                    end
-                    else if ((xx > 0) && (!busy)) begin
-                        data <= xx[7:0];
-                        xx <= xx >> 8;
-                        start_tx <= 1;
-                    end
-                    else if (busy) begin
-                        start_tx <= 0;
-                    end
-                    else if ((xx == 0) && (!busy)) begin
-                        state <= state + 1;
-                    end
+                // else if (bit == 9) begin
+                //     bit <= bit + 1; // wait one more
+                // end
+                else begin
+                    bit   <= 0;
+                    data  <= buffer;
+                    ready <= 1;
                 end
-                2'b10: begin
-                    if (s < 50_000_000) begin
-                        s <= s + 1;
-                    end
-                    else begin
-                        s <= 0;
-                        state <= 0;
-                    end
-                end
-                default: begin
-                    state <= 0;
-                    start_tx <= 0;
-                end
-            endcase
+            end
         end
     end
 endmodule
