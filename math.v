@@ -1688,7 +1688,7 @@ module pollard(
         case (state)
             7'b0000000: begin
                 ops <= 0;
-                leds <= 4'b1110;
+                leds <= 4'b1111;
                 // leds <= l;
                 // l <= l - 1;
                 state <= 7'b0000001;
